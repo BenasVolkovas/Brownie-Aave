@@ -7,6 +7,9 @@ AMOUNT = Web3.toWei(0.1, "ether")
 
 
 def approve_erc20(amount, spender, erc20Address, account):
+    """
+    Approves the spender (lending pool) to trade specified amount of token
+    """
     print("Approving ERC20 token...")
     erc20 = interface.IERC20(erc20Address)
     tx = erc20.approve(spender, amount, {"from": account})
@@ -16,6 +19,10 @@ def approve_erc20(amount, spender, erc20Address, account):
 
 
 def get_lending_pool():
+    """
+    Lending pool address might change in the future,
+    so this function returns the address of an active lending pool contract
+    """
     lendingPoolAddressesProvider = interface.ILendingPoolAddressesProvider(
         config["networks"][network.show_active()]["lending_pool_addresses_provider"]
     )
@@ -27,6 +34,9 @@ def get_lending_pool():
 
 
 def get_borrow_data(lendingPool, account):
+    """
+    Gets account data for lendingPool
+    """
     (
         totalCollateralEth,
         totalDebtEth,
@@ -45,10 +55,21 @@ def get_borrow_data(lendingPool, account):
 
 
 def get_asset_price(price_feed_address):
-    pass
+    """
+    From oracle gets the price and returns converted price to ether decimal value
+    """
+    daiEthPriceFeed = interface.IAggregatorV3(price_feed_address)
+    latestPrice = daiEthPriceFeed.latestRoundData()[1]
+    convertedLatestPrice = Web3.fromWei(latestPrice, "ether")
+    print(f"The DAI/ETH price is {convertedLatestPrice}")
+    return float(convertedLatestPrice)
 
 
 def aave_borrow():
+    """
+    Gets lending pool, approves tokens spend, deposits tokens,
+    gets account data and latest price,
+    """
     account = get_account()
     erc20Address = config["networks"][network.show_active()]["weth_token"]
 
@@ -68,6 +89,9 @@ def aave_borrow():
     daiEthPrice = get_asset_price(
         config["networks"][network.show_active()]["dai_eth_price_feed"]
     )
+
+    # Borrowable ETH -> borrowable DAI * 95%
+    amountDaiToBorrow = (1 / daiEthPrice) * (borrowableEth * 0.95)
 
 
 def main():
