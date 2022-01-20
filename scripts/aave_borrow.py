@@ -54,15 +54,33 @@ def get_borrow_data(lendingPool, account):
     return (float(availableBorrowEth), float(totalDebtEth))
 
 
-def get_asset_price(price_feed_address):
+def get_asset_price(priceFeedAddress):
     """
     From oracle gets the price and returns converted price to ether decimal value
     """
-    daiEthPriceFeed = interface.IAggregatorV3(price_feed_address)
+    daiEthPriceFeed = interface.IAggregatorV3(priceFeedAddress)
     latestPrice = daiEthPriceFeed.latestRoundData()[1]
     convertedLatestPrice = Web3.fromWei(latestPrice, "ether")
     print(f"The DAI/ETH price is {convertedLatestPrice}")
     return float(convertedLatestPrice)
+
+
+def repay_all(amount, lendingPool, account):
+    approve_erc20(
+        Web3.toWei(amount, "ether"),
+        lendingPool,
+        config["networks"][network.show_active()]["dai_token"],
+        account,
+    )
+    repayTx = lendingPool.repay(
+        config["networks"][network.show_active()]["dai_token"],
+        amount,
+        1,
+        account.address,
+        {"from": account},
+    )
+    repayTx.wait(1)
+    print("Repaid!")
 
 
 def aave_borrow():
@@ -90,8 +108,25 @@ def aave_borrow():
         config["networks"][network.show_active()]["dai_eth_price_feed"]
     )
 
-    # Borrowable ETH -> borrowable DAI * 95%
-    amountDaiToBorrow = (1 / daiEthPrice) * (borrowableEth * 0.95)
+    # Borrowable ETH -> borrowable DAI * percentage
+    amountDaiToBorrow = (1 / daiEthPrice) * (borrowableEth * 0.50)
+    print(f"We are going to borrow {amountDaiToBorrow} DAI")
+
+    # Borrow asset
+    daiAddress = config["networks"][network.show_active()]["dai_token"]
+    borrowTx = lendingPool.borrow(
+        daiAddress,
+        Web3.toWei(amountDaiToBorrow, "ether"),
+        1,
+        0,
+        account.address,
+        {"from": account},
+    )
+    borrowTx.wait(1)
+    print("Borrowed DAI token")
+
+    repay_all(amountDaiToBorrow, lendingPool, account)
+    print("Deposidted, borrowed and repaid with AAVE")
 
 
 def main():
